@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -14,21 +15,21 @@ namespace Events.backend
 {
     class Program
     {
-            private static List<Datum> events1 = new List<Datum>();
+        private static List<Datum> events1 = new List<Datum>();
         private static int calls = 0;
         private static int ci = 0;
-        private static int nextStep=3;
-        private static int increment = 3;
+        private static int nextStep=100;
+        private static int increment = 1;
         private static bool helper = false;
         private static int numCalls = 0;
+        private static Stopwatch stopWatch;
         static void Main()
         {
-            
+            stopWatch = new Stopwatch();
+            stopWatch.Start();
+            Console.WriteLine("Hit ENTER to exit...");
             callMore();
 
-           
-            Console.WriteLine("Hit ENTER to exit...");
-           
 
             Console.ReadLine();
         }
@@ -38,9 +39,12 @@ namespace Events.backend
 
             Console.WriteLine(nextStep + "more");
             numCalls = 0;
+            
             for (int i = ci; i < ci+nextStep ; i++)
             {
                 numCalls++;
+                Console.WriteLine("call started " + i);
+                //Task.Run(() => MakeRequest(i, Completed));
                 MakeRequest(i, Completed);
             }
             ci = ci + nextStep;
@@ -51,18 +55,25 @@ namespace Events.backend
 
         private static void Completed(RootObject file)
         {
-            if (file.data.Count == 0)
+            lock (events1)
             {
-                helper = true;
-            }
-            else
-            {
-                events1.AddRange(file.data);
-            }
+                if (file.data != null)
+                {
+                    if (file.data.Count != 0)
+                    {
+                        events1.AddRange(file.data);
+
+                        if (file.data.Count < 100)
+                        {
+                            helper = true;
+                        }
+                    }
+                }
             //Console.WriteLine("Call...");
             if (calls == numCalls)
-               results();
+                results();
             //this method will be called whenever a file is processed
+            }
         }
 
         private static void results()
@@ -84,6 +95,15 @@ namespace Events.backend
                 //}
 
                 Console.WriteLine(events1.Count);
+                stopWatch.Stop();
+                // Get the elapsed time as a TimeSpan value.
+                TimeSpan ts = stopWatch.Elapsed;
+
+                // Format and display the TimeSpan value.
+                string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                    ts.Hours, ts.Minutes, ts.Seconds,
+                    ts.Milliseconds / 10);
+                Console.WriteLine("RunTime " + elapsedTime);
             }
         }
 
@@ -96,9 +116,17 @@ namespace Events.backend
             client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", "5b298f3bad504791a7052c6d6257f97b");
 
             // Request parameters
+
             queryString["city"] = "New York";
             queryString["state"] = "NY";
-            queryString["country"] = "United states";
+            queryString["country"] = "United States";
+
+
+            //queryString["city"] = "Novi Sad";
+            //queryString["state"] = "VO";
+            //queryString["country"] = "Yugoslavia";
+
+
             queryString["page"] = page.ToString();
             var uri = "https://api.allevents.in/events/list/?" + queryString;
 
